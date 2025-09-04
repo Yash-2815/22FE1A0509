@@ -1,12 +1,8 @@
-const express = require('express');
 const axios = require('axios');
-const app = express();
-app.use(express.json());
 
 // Replace this with your actual token from onboarding/docs
 const AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJNYXBDbGFpbXMiOnsiYXVkIjoiaHR0cDovLzIwLjI0NC41Ni4xNDQvZXZhbHVhdGlvbi1zZXJ2aWNlIiwiZW1haWwiOiJ5YXN3YW50aGJhZGV0aUBnbWFpbC5jb20iLCJleHAiOjE3NTY5NjcxODIsImlhdCI6MTc1Njk2NjI4MiwiaXNzIjoiQWZmb3JkIE1lZGljYWwgVGVjaG5vbG9naWVzIFByaXZhdGUgTGltaXRlZCIsImp0aSI6ImMxMjZkMTZmLWM5OWEtNDk0NS1hYzM2LThjMDM4Zjc4N2YwYSIsImxvY2FsZSI6ImVuLUlOIiwibmFtZSI6Inlhc2h3YW50aCBiYWRldGkiLCJzdWIiOiIzZGMwYTI2Yy05YjQ1LTQ2NjQtYWI2Yi03MTM4NTM4NGZkZTMifSwiZW1haWwiOiJ5YXN3YW50aGJhZGV0aUBnbWFpbC5jb20iLCJuYW1lIjoieWFzaHdhbnRoIGJhZGV0aSIsInJvbGxObyI6IjIyZmUxYTA1MDkiLCJhY2Nlc3NDb2RlIjoiWXp1SmVVIiwiY2xpZW50SUQiOiIzZGMwYTI2Yy05YjQ1LTQ2NjQtYWI2Yi03MTM4NTM4NGZkZTMiLCJjbGllbnRTZWNyZXQiOiJKRGZoc1JQUnNBUXZVZkpDIn0.uZXhmI5dy-nSQtYw58aTexbpNqYJde-Yib925nGmvtk';
 
-// Allowed stacks, levels, and packages
 const STACKS = ["backend", "frontend"];
 const LEVELS = ["debug", "info", "warn", "error", "fatal"];
 const PACKAGES = {
@@ -21,7 +17,6 @@ const PACKAGES = {
     ]
 };
 
-// Helper validation function
 function isValid(stack, level, pkg) {
     if (!STACKS.includes(stack)) return false;
     if (!LEVELS.includes(level)) return false;
@@ -29,8 +24,7 @@ function isValid(stack, level, pkg) {
     return true;
 }
 
-const log = async (stack, level, pkg, message) => {
-    // Lowercase normalization and validation
+async function log(stack, level, pkg, message) {
     stack = (stack || "").toLowerCase();
     level = (level || "").toLowerCase();
     pkg = (pkg || "").toLowerCase();
@@ -47,28 +41,27 @@ const log = async (stack, level, pkg, message) => {
             logData,
             {
                 headers: {
-                    Authorization: `Bearer ${AUTH_TOKEN}` // You may need to change header name as per API requirements
+                    Authorization: `Bearer ${AUTH_TOKEN}`
                 }
             }
         );
         return response.data;
     } catch (err) {
-        // Relay server error response or friendly message
-        throw err.response?.data || err;
+        // Do not block request in case of logging failure
+        return null;
     }
-};
+}
 
-// Endpoint for custom logging
-app.post('/log', async (req, res) => {
-    const { stack, level, package: pkg, message } = req.body;
+module.exports = async function loggingMiddleware(req, res, next) {
     try {
-        const result = await log(stack, level, pkg, message);
-        res.status(200).json(result);
-    } catch (e) {
-        res.status(401).json({ error: e.message });
+        await log(
+            "backend",                // stack
+            "info",                   // level
+            "middleware",             // package
+            `${req.method} ${req.originalUrl} | IP: ${req.ip}` // message
+        );
+    } catch (err) {
+        // Optionally console.error(err);
     }
-});
-// Start server
-app.listen(3000, () => {
-    console.log('Express server listening on port 3000');
-});
+    next();
+};
